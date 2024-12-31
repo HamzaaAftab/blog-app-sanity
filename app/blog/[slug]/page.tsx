@@ -3,35 +3,37 @@ import { client } from "@/sanity/lib/client";
 import { urlForImage } from "@/sanity/lib/image";
 import { PortableText } from "@portabletext/react";
 
-export const revalidate = 60; // seconds
+export const revalidate = 60; // Revalidate every 60 seconds
 
 // Generate static paths for dynamic routes
 export async function generateStaticParams() {
-  const query = `*[_type=='post']{
-    "slug":slug.current
+  const query = `*[_type == "post"] {
+    "slug": slug.current
   }`;
+
   const slugs = await client.fetch(query);
 
-  // Ensure the returned structure matches { params: { slug: string } }
+  // Return the params in the correct structure
   return slugs.map((item: { slug: string }) => ({
     params: { slug: item.slug },
   }));
 }
 
 // To create static pages for dynamic routes
-export default async function page({ params }: { params: { slug: string } }) {
+export default async function Page({ params }: { params: { slug: string } }) {
   const { slug } = params;
 
-  // Sanity query to fetch post data
-  const query = `*[_type=='post' && slug.current=="${slug}"]{
-    title,summary,image,content,
-    author->{bio,image,name}
-  }[0]`;
-  const post = await client.fetch(query);
+  // Fetch the post data based on the slug
+  const query = `*[_type == "post" && slug.current == $slug][0] {
+    title, summary, image, content,
+    author->{bio, image, name}
+  }`;
 
-  // Handle case when post is not found
+  const post = await client.fetch(query, { slug });
+
+  // If the post is not found, render a fallback message
   if (!post) {
-    return <p>Post not found</p>;
+    return <div>Post not found.</div>;
   }
 
   return (
@@ -70,7 +72,7 @@ export default async function page({ params }: { params: { slug: string } }) {
         <PortableText value={post.content} />
       </section>
 
-      {/* Author Section (Image & Bio) */}
+      {/* Author Section */}
       <section className="px-2 sm:px-8 md:px-12 flex gap-2 xs:gap-4 sm:gap-6 items-start xs:items-center justify-start">
         <Image
           src={urlForImage(post.author.image)}
